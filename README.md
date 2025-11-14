@@ -1,236 +1,170 @@
-📘 README.md — Automated Weather Pipeline using Airflow, AWS Glue & Athena
-# Automated Weather Pipeline using Airflow, AWS Glue & Athena
 
-This project is a complete end-to-end data engineering pipeline that ingests weather data from a REST API, stores raw files in S3, processes them using AWS Glue (PySpark), catalogs them using Glue Crawler, and makes the final dataset queryable via Amazon Athena. Apache Airflow orchestrates the entire workflow using two DAGs.
 
-This architecture demonstrates production-style ETL capabilities expected from a Data Engineer with **1–2 years of experience**.
+# **README.md — Automated Weather Pipeline (Airflow + AWS Glue)**
 
----
+````markdown
+# Automated Weather Pipeline (Airflow + AWS Glue)
 
-## 🚀 Architecture Overview
-
-![Architecture](airflow.png)
-
-### **High-Level Workflow**
-1. **Airflow (DAG 1)** makes API calls and uploads raw weather data to S3.
-2. **Airflow (DAG 2)** waits for the previous run and triggers AWS Glue.
-3. **AWS Glue ETL** processes & cleans the data and writes partitioned Parquet files.
-4. **AWS Glue Crawler** updates the schema automatically in the Data Catalog.
-5. **Amazon Athena** allows running analytical queries over optimized Parquet files.
+This project is a real data engineering workflow I built to automate weather data ingestion, cleaning, and analytics using **Airflow**, **AWS Glue**, **S3**, **Glue Crawler**, and **Athena**.  
+The pipeline runs in two stages:  
+**(1) fetch & store raw data**,  
+**(2) clean & prepare data for analytics**.
 
 ---
 
-## 🧱 Project Structure
+## 🔥 What This Pipeline Does (In Simple Words)
 
+1. **Airflow DAG #1** calls a weather API → stores raw JSON in S3.  
+2. **Airflow DAG #2** waits for that raw file → triggers a Glue ETL job.  
+3. **Glue PySpark script** cleans/normalizes the JSON → writes partitioned Parquet to S3.  
+4. **Glue Crawler** picks up new files → updates the Data Catalog.  
+5. **Athena** queries the final dataset in seconds.
 
-
-Automated-Weather-Pipeline-using-Airflow/
-│
-├── dags/
-│ ├── dag_api_extract.py # DAG 1 – API extraction → S3 raw
-│ └── dag_trigger_glue.py # DAG 2 – Trigger Glue job
-│
-├── glue_scripts/
-│ └── weather_glue_transform.py # PySpark Glue ETL script
-│
-├── requirements.txt
-├── airflow.png # Architecture diagram
-└── README.md
-
+This is the exact workflow used in most production ETL setups.
 
 ---
 
-## 🛠️ Tech Stack
+## 📌 Why I Built It
 
-### **Orchestration**
-- Apache Airflow (Docker + docker-compose)
+I wanted a project that shows **actual skills** a data engineer uses daily:
 
-### **AWS Services**
-- Amazon S3 (Raw + Cleaned zones)
-- AWS Glue ETL (PySpark)
-- AWS Glue Crawler
-- AWS Glue Data Catalog
-- Amazon Athena
-- IAM Roles
-- CloudWatch (Monitoring)
+- scheduling / dependencies (Airflow)  
+- API ingestion  
+- S3 raw layer → cleaned layer  
+- distributed Spark transformation (Glue)  
+- schema automation (Crawler)  
+- SQL analytics (Athena)
 
-### **Languages & Libraries**
-- Python 3.x
-- Boto3
-- PySpark
-- Requests / JSON processing
+This pipeline covers the full lifecycle from ingestion → transformation → analytics.
 
 ---
 
-## ⚙️ Setup & Execution Steps
+## 🧩 How I Designed the Pipeline (My Steps)
 
-### **1. Airflow Setup using Docker**
-```bash
-mkdir -p dags logs plugins
-docker-compose up -d
+### **1. Airflow setup (Docker)**
+- Installed Airflow using Docker  
+- Created `dags/`, `logs/`, `plugins/` folders  
+- Launched Airflow:
+  ```bash
+  docker-compose up -d
+````
 
+### **2. Raw & Clean Buckets**
 
-Copy the dags/ folder from this repo into your Airflow container's DAG directory.
+Created two prefixes:
 
-2. Create S3 Buckets
+* `s3://bucket/raw/`
+* `s3://bucket/cleaned/`
 
-Use two prefixes (or two buckets):
+### **3. DAG 1 — API Extraction**
 
-s3://<bucket>/raw/weather/
+* Called the weather REST API
+* Saved response locally
+* Uploaded file to `raw/DATE/` folder in S3
+* Added retries for API failures
+* Logged file name + S3 key for traceability
 
-s3://<bucket>/cleaned/weather/
+### **4. Glue ETL Script**
 
-Raw → from API
-Cleaned → Glue ETL output
+* Read raw JSON files from S3
+* Flattened nested attributes
+* Renamed columns
+* Cleaned inconsistent rows
+* Converted timestamp formats
+* Wrote **partitioned Parquet** to:
 
-3. DAG 1: API Extraction (Airflow)
+  ```
+  s3://bucket/cleaned/date=YYYY-MM-DD/
+  ```
 
-Task Flow:
+### **5. DAG 2 — Trigger Glue**
 
-fetch_weather_data: Call REST API and download weather JSON/CSV.
+* Waited for yesterday’s raw data
+* Started Glue job
+* Polled job status
+* Optional: triggered crawler after success
 
-Upload to S3 → s3://bucket/raw/weather/<date>/file.json
+### **6. Glue Crawler**
 
-Retry enabled for API failures.
+* Pointed to `cleaned/` folder
+* Created Athena table automatically
+* Managed schema updates (new columns, partitions)
 
-This ensures raw data is ingested daily/hourly.
+### **7. Athena**
 
-4. Create AWS Glue Job
+Queried everything using SQL.
 
-Your Glue job:
+Example:
 
-Name: weather-glue-job
+```sql
+SELECT temperature, humidity, observation_time 
+FROM weather_db.weather_data
+ORDER BY observation_time DESC;
+```
 
-Script: uploaded from glue_scripts/weather_glue_transform.py
+---
 
-Temporary dir: s3://bucket/glue-temp/
+## 🗂️ Repository Structure
 
-IAM role: Glue-execution-role
+```
+/dags
+    ├── dag_api_extract.py
+    ├── dag_trigger_glue.py
 
-Glue version: 3.0 or 4.0
+/glue_scripts
+    └── weather_glue_transform.py
 
-Worker type: Standard (for small datasets)
+requirements.txt
+airflow.png
+README.md
+```
 
-Glue Script Responsibilities:
+---
 
-Read raw JSON/CSV from S3
+## 🧠 Key Things I Learned / Implemented
 
-Flatten nested attributes
+* **Idempotent ingestion** → each DAG run creates a unique raw file
+* **Partition strategy** → optimized Athena scan cost
+* **PySpark transformations** → flattened JSON cleanly
+* **Airflow → Glue integration** using Boto3
+* **Crawler automation** → no manual schema updates
+* **Two-DAG design** → clear separation of ingestion vs transformation
 
-Rename & clean column names
+---
 
-Drop null/broken records
+## 🎯 What This Pipeline Proves About My Skills
 
-Convert timestamps & types
+* I can design cloud ETL with real orchestration.
+* I know how to handle raw → processed → query layers.
+* I can work with AWS Glue, S3, Athena, and Airflow in a practical setup.
+* I understand schema evolution, reliability, retries, and monitoring.
+* I can build pipelines that follow real-world patterns.
 
-Write partitioned Parquet:
+---
 
-s3://bucket/cleaned/weather/observation_date=YYYY-MM-DD/
+## 📎 Architecture Diagram
 
-5. DAG 2: Trigger AWS Glue ETL
+![Pipeline Architecture](airflow.png)
 
-Steps:
+---
 
-Wait for previous day’s extraction results.
+## 👤 Author
 
-Start the Glue job using Boto3.
-
-Poll job status until completion.
-
-Optionally trigger Glue crawler.
-
-This ensures transformation occurs only after raw data is available.
-
-6. Glue Crawler & Athena
-
-Glue Crawler Config:
-
-Source: s3://bucket/cleaned/weather/
-
-Role: Crawler role with S3 read + Glue write
-
-Destination DB: weather_db
-
-Running the crawler creates or updates the table schema.
-
-7. Query Using Athena
-
-Sample Query:
-
-SELECT
-    station_id,
-    temperature,
-    humidity,
-    wind_speed,
-    observation_time
-FROM weather_db.weather_table
-WHERE observation_date = current_date
-ORDER BY observation_time DESC
-LIMIT 50;
-
-🎯 Key Data Engineering Concepts Demonstrated
-
-Scheduled & automated API ingestion
-
-Raw → Processed → Analytics data modeling
-
-Distributed transformations using PySpark
-
-Partition strategy for performance
-
-Schema management with Glue Crawler
-
-Cost-effective querying with Athena
-
-Workflow dependencies & retries in Airflow
-
-Infrastructure-as-code style reproducibility
-
-🧪 Testing the Pipeline
-Airflow Local Testing
-airflow tasks test dag_api_extract fetch_weather_data 2024-01-01
-
-Glue Local Testing (Sample Data)
-
-Run PySpark locally with sample JSON.
-
-Verify in S3
-
-Raw data under raw/weather/YYYY-MM-DD
-
-Processed Parquet under cleaned/weather/
-
-Verify in Athena
-
-Table should show new partitions after crawler run.
-
-🔥 Resume-Ready Highlights
-
-Use these in job applications:
-
-Built a production-style ETL pipeline using Airflow → S3 → Glue → Athena, converting API data into query-ready partitioned Parquet datasets.
-
-Automated ingestion, transformation, cataloging, and analytics using two Airflow DAGs and AWS Glue PySpark.
-
-Implemented schema evolution, partition management, error handling, and retries for reliable orchestration.
-
-Designed S3-based medallion architecture (raw + cleaned zones) for scalable analytical workflows.
-
-👤 Author
-
-Gnana Prakash N
-Aspiring Data Engineer
+**Gnana Prakash N**
+Data Engineering Enthusiast
 GitHub: gnanaprakashn
 
-📄 License
-
-MIT © 2025
-
+```
 
 ---
 
-If you want:
-✅ A shorter README  
-✅ A version for your portfolio website  
-✅ Bullet points specifically optimized for HR  
-Just tell me.
+If you want the README even **shorter**, **more aggressive**, or **more senior-looking**, tell me the style:
+
+- 🔵 **Short & Clean**  
+- 🔴 **Bold & Confident**  
+- 🟢 **More technical**  
+- 🟣 **More storytelling**  
+- 🟠 **Resume-oriented**  
+
+Pick a style, and I’ll rewrite the whole README again.
+```
