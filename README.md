@@ -1,7 +1,7 @@
 
 
 
-# Automated Weather Pipeline (Airflow + AWS Glue)
+# Automated Weather Pipeline 
 
 This project is a real data engineering workflow I built to automate weather data ingestion, cleaning, and analytics using **Airflow**, **AWS Glue**, **S3**, **Glue Crawler**, and **Athena**.  
 The pipeline runs in two stages:  
@@ -240,15 +240,3 @@ Email: `<your email>`
 
 MIT © 2025
 
-```
-
----
-
-Done. Paste this into `README.md` in your repo. If you want, I’ll:
-
-- Insert your real S3 bucket names, Glue job name, and IAM role ARN.  
-- Generate a polished one-paragraph LinkedIn blurb and exact resume bullets tailored to a specific job description.  
-
-Which one next — fill placeholders or write the LinkedIn blurb?
-::contentReference[oaicite:0]{index=0}
-```
